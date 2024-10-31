@@ -1,4 +1,6 @@
+import io
 import pprint
+from jvm_opcode import op_code
 
 pp = pprint.PrettyPrinter(indent=2)
 bytecode_file = 'Main.class'
@@ -57,7 +59,7 @@ with open(bytecode_file, 'rb') as fin:
             string_index = int.from_bytes(fin.read(2))
             constant_pool.append({
                 'tag': tag,
-                'sring_index': string_index
+                'string_index': string_index
             })
         
         elif tag == CONSTANT_Class:
@@ -136,24 +138,27 @@ with open(bytecode_file, 'rb') as fin:
         descriptor_index = int.from_bytes(fin.read(2))
         attributes_count = int.from_bytes(fin.read(2))
 
+        attributes = []
         for j in range(attributes_count):
             attribute_name_index = int.from_bytes(fin.read(2))
             attribute_length = int.from_bytes(fin.read(4))
             info = fin.read(attribute_length)
-
-            print('attribute_name_index', attribute_name_index)
-            print('attribute_length', attribute_length)
-            print('info', info)
+            attributes.append({
+                'attribute_name_index': attribute_name_index,
+                'attribute_length': attribute_length,
+                'info': info
+            })
 
         methods.append(
             {
                 'access_flags': access_flags,
                 'name_index': name_index,
                 'descriptor_index': descriptor_index,
-                'attributes_count': attributes_count
+                'attributes_count': attributes_count,
+                'attributes': attributes
             }
         )
-    
+
     attributes_count = int.from_bytes(fin.read(2))
     print('attributes_count', attributes_count)
 
@@ -169,3 +174,57 @@ with open(bytecode_file, 'rb') as fin:
     # pp.pprint(methods)
 
     assert len(constant_pool) == constant_pool_count
+
+    print('-'* 50)
+
+    for method in methods:
+        name_index = method['name_index']
+        name_constant = constant_pool[name_index]['bytes']
+        name = name_constant.decode('utf-8')
+        
+        if name == 'main':
+            for attr in method['attributes']:
+                attribute_name_index = attr['attribute_name_index']
+                attribute_name_constant = constant_pool[attribute_name_index]['bytes']
+                attribute_name = attribute_name_constant.decode('utf-8')
+                
+                if attribute_name == 'Code':
+                    info = attr['info']
+                    info_io = io.BytesIO(info)
+                    max_stack = int.from_bytes(info_io.read(2))
+                    max_locals = int.from_bytes(info_io.read(2))
+                    code_length = int.from_bytes(info_io.read(4))
+                    code = info_io.read(code_length)
+
+                    print('max_stack', max_stack)
+                    print('max_locals', max_locals)
+                    print('code_length', code_length)
+                    print('code', code)
+
+                    l = len(code)
+                    i = 0
+                    while i < l:
+                        op = code[i]
+                        if op == op_code['getstatic']:
+                            print('getstatic')
+                            val = code[i+1] << 8 | code[i+2]
+                            # print(val)
+                            i+=3
+                        elif op == op_code['ldc']:
+                            print('ldc')
+                            val = code[i+1]
+                            # print(val)
+                            val2 = constant_pool[val]['string_index']
+                            print(constant_pool[val2])
+                            i+=2
+                        elif op == op_code['invokevirtual']:
+                            print('invokevirtual')
+                            val = code[i+1] << 8 | code[i+2]
+                            print(constant_pool[constant_pool[constant_pool[val]['name_and_type_index']]['name_index']])
+                            i+=3
+                        elif op == op_code['return']:
+                            print('return')
+                            i+=1
+                        else:
+                            print(op)
+                            assert False
