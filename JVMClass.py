@@ -167,6 +167,54 @@ class JVMClass:
                 return code_attr
         return None
 
+    def resolve_constant_val_at(self, idx):
+        constant = self.get_constant(idx)
+        if constant['tag'] == CONSTANT_Fieldref:
+            return {
+                'tag': CONSTANT_Fieldref,
+                'tag_name': 'CONSTANT_Fieldref',
+                'class_index': constant['class_index'],
+                'class': self.resolve_constant_val_at(constant['class_index']),
+                'name_and_type_index': constant['name_and_type_index'],
+                'name_and_type': self.resolve_constant_val_at(constant['name_and_type_index'])
+            }
+
+        elif constant['tag'] == CONSTANT_Class:
+            return {
+                'tag': CONSTANT_Class,
+                'tag_name': 'CONSTANT_Class',
+                'name_index': constant['name_index'],
+                'name': self.resolve_constant_val_at(constant['name_index'])
+            }
+        
+        elif constant['tag'] == CONSTANT_Utf8:
+            return constant['bytes']
+        
+        elif constant['tag'] == CONSTANT_String:
+            return self.resolve_constant_val_at(constant['string_index'])
+        
+        elif constant['tag'] == CONSTANT_Methodref:
+            return {
+                'tag': CONSTANT_Methodref,
+                'tag_name': 'CONSTANT_Methodref',
+                'class_index': constant['class_index'],
+                'class': self.resolve_constant_val_at(constant['class_index']),
+                'name_and_type_index': constant['name_and_type_index'],
+                'name_and_type': self.resolve_constant_val_at(constant['name_and_type_index'])
+            }
+
+        elif constant['tag'] == CONSTANT_NameAndType:
+            return {
+                'tag': constant['tag'],
+                'name_index': constant['name_index'],
+                'name': self.resolve_constant_val_at(constant['name_index']),
+                'descriptor_index': constant['descriptor_index'],
+                'descriptor': self.resolve_constant_val_at(constant['descriptor_index']),
+            }
+
+        else:
+            assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
+
     def execute(self, code_attr):
         code_io = io.BytesIO(code_attr['code'])
 
@@ -174,14 +222,34 @@ class JVMClass:
             op = parse_u1(code_io)
 
             if op == op_code['getstatic']:
-                print('getstatic')
                 val = parse_u2(code_io)
+                constant = self.resolve_constant_val_at(val)
+                if constant['tag'] == CONSTANT_Fieldref:
+                    print(
+                        'getstatic',
+                        constant['class']['name'],
+                        constant['name_and_type']['name'],
+                        constant['name_and_type']['descriptor']
+                    )
+                else:
+                    assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
+
             elif op == op_code['ldc']:
-                print('ldc')
                 val = parse_u1(code_io)
+                constant = self.resolve_constant_val_at(val)
+                print('ldc', constant)
             elif op == op_code['invokevirtual']:
-                print('invokevirtual')
                 val = parse_u2(code_io)
+                constant = self.resolve_constant_val_at(val)
+                if constant['tag'] == CONSTANT_Methodref:
+                    print(
+                        'invokevirtual',
+                        constant['class']['name'],
+                        constant['name_and_type']['name'],
+                        constant['name_and_type']['descriptor']
+                    )
+                else:
+                    assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
             elif op == op_code['return']:
                 print('return')
             elif op == op_code['invokespecial']:
