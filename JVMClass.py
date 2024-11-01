@@ -217,39 +217,34 @@ class JVMClass:
 
     def execute(self, code_attr):
         code_io = io.BytesIO(code_attr['code'])
-
+        stack = []
         while code_io.tell() < len(code_attr['code']):
             op = parse_u1(code_io)
 
             if op == op_code['getstatic']:
+                print('getstatic')
                 val = parse_u2(code_io)
                 constant = self.resolve_constant_val_at(val)
                 if constant['tag'] == CONSTANT_Fieldref:
-                    print(
-                        'getstatic',
-                        constant['class']['name'],
-                        constant['name_and_type']['name'],
-                        constant['name_and_type']['descriptor']
-                    )
+                    stack.append({
+                        'class': constant['class']['name'],
+                        'name': constant['name_and_type']['name'],
+                        'descriptor': constant['name_and_type']['descriptor']
+                    })
                 else:
                     assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
 
             elif op == op_code['ldc']:
+                print('ldc')
                 val = parse_u1(code_io)
                 constant = self.resolve_constant_val_at(val)
-                print('ldc', constant)
+                stack.append(constant)
             elif op == op_code['invokevirtual']:
+                print('invokevirtual')
                 val = parse_u2(code_io)
                 constant = self.resolve_constant_val_at(val)
-                if constant['tag'] == CONSTANT_Methodref:
-                    print(
-                        'invokevirtual',
-                        constant['class']['name'],
-                        constant['name_and_type']['name'],
-                        constant['name_and_type']['descriptor']
-                    )
-                else:
-                    assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
+                stack.pop()
+                stack.pop()
             elif op == op_code['return']:
                 print('return')
             elif op == op_code['invokespecial']:
@@ -259,12 +254,20 @@ class JVMClass:
                 print('aload_0')
             elif op == op_code['iload_0']:
                 print('iload_0')
+                stack.append(0)
             elif op == op_code['iconst_1']:
                 print('iconst_1')
+                stack.append(1)
             elif op == op_code['iadd']:
                 print('iadd')
+                val2 = stack.pop()
+                val1 = stack.pop()
+                stack.append(val1 + val2)
             elif op == op_code['ireturn']:
                 print('ireturn')
+                stack.pop()
             else:
                 print(hex(op))
                 assert False, 'Op Code Not implemented'
+
+            print(stack)
