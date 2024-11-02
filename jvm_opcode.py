@@ -12,5 +12,11 @@ op_code = {
     'bipush': 0x10,
     'invokestatic': 0xb8,
     'istore_1': 0x3c,
-    'iload_1': 0x1b
+    'iload_1': 0x1b,
+    'iconst_0': 0x3,
+    'iconst_2': 0x5,
+    'if_icmpge': 0xa2,
+    'if_icmple': 0xa4,
+    'iinc': 0x84,
+    'goto': 0xa7
 }

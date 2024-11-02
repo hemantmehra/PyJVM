@@ -8,8 +8,10 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        int a = 42;
-        System.out.println("Hello");
-        System.out.println(a + 1);
+        int i = 0;
+        while (i < 2) {
+            System.out.println("Hello");
+            i++;
+        }
     }
 }

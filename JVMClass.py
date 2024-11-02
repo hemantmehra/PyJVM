@@ -1,14 +1,14 @@
 import io
 from jvm_opcode import op_code
 
-def parse_u1(fin):
-    return int.from_bytes(fin.read(1))
+def parse_u1(fin, signed=False):
+    return int.from_bytes(fin.read(1), signed=signed)
 
-def parse_u2(fin):
-    return int.from_bytes(fin.read(2))
+def parse_u2(fin, signed=False):
+    return int.from_bytes(fin.read(2), signed=signed)
 
-def parse_u4(fin):
-    return int.from_bytes(fin.read(4))
+def parse_u4(fin, signed=False):
+    return int.from_bytes(fin.read(4), signed=signed)
 
 CONSTANT_Class = 7
 CONSTANT_Fieldref = 9
@@ -230,13 +230,14 @@ class JVMClass:
         max_locals = code_attr['max_locals']
         locals = [None] * max_locals
         code_io = io.BytesIO(code_attr['code'])
+        print(code_attr['code'])
         stack = []
         bytecodes = []
         while code_io.tell() < len(code_attr['code']):
             op = parse_u1(code_io)
 
             if op == op_code['getstatic']:
-                bytecodes.append('getstatic')
+                print(code_io.tell()-1, '>>', 'getstatic')
                 val = parse_u2(code_io)
                 constant = self.resolve_constant_val_at(val)
                 if constant['tag'] == CONSTANT_Fieldref:
@@ -249,54 +250,93 @@ class JVMClass:
                     assert False, f"tag {constant['tag']} not implemented for resolve_constant_val, constant: {constant}"
 
             elif op == op_code['ldc']:
-                bytecodes.append('ldc')
+                print(code_io.tell()-1, '>>', 'ldc')
                 val = parse_u1(code_io)
                 constant = self.resolve_constant_val_at(val)
                 stack.append(constant)
             elif op == op_code['invokevirtual']:
-                bytecodes.append('invokevirtual')
+                print(code_io.tell()-1, '>>', 'invokevirtual')
                 val = parse_u2(code_io)
                 constant = self.resolve_constant_val_at(val)
                 arg = stack.pop()
                 obj = stack.pop()
                 self.invoke_virtual(obj, constant, arg)
             elif op == op_code['invokestatic']:
-                bytecodes.append('invokestatic')
+                print('>>', 'invokestatic')
                 val = parse_u2(code_io)
                 constant = self.resolve_constant_val_at(val)
                 assert False, f'Op Code {hex(op)} Not implemented'
             elif op == op_code['return']:
-                bytecodes.append('return')
+                print('>>', 'return')
             elif op == op_code['invokespecial']:
-                bytecodes.append('invokespecial')
+                print('>>', 'invokespecial')
                 val = parse_u2(code_io)
-            elif op == op_code['aload_0']:
-                bytecodes.append('aload_0')
             elif op == op_code['iload_0']:
-                bytecodes.append('iload_0')
+                print('>>', 'iload_0')
                 stack.append(0)
             elif op == op_code['istore_1']:
+                print(code_io.tell()-1, '>>', 'istore_1')
                 val = stack.pop()
                 locals[1] = val
             elif op == op_code['iload_1']:
+                print(code_io.tell()-1, '>>', 'iload_1')
                 stack.append(locals[1])
+            elif op == op_code['iconst_0']:
+                print(code_io.tell()-1, '>>', 'iconst_0')
+                stack.append(0)
             elif op == op_code['iconst_1']:
-                bytecodes.append('iconst_1')
+                print('>>', 'iconst_1')
                 stack.append(1)
+            elif op == op_code['iconst_2']:
+                print(code_io.tell()-1, '>>', 'iconst_2')
+                stack.append(2)
             elif op == op_code['iadd']:
-                bytecodes.append('iadd')
+                print('>>', 'iadd')
                 val2 = stack.pop()
                 val1 = stack.pop()
                 stack.append(val1 + val2)
             elif op == op_code['ireturn']:
-                bytecodes.append('ireturn')
+                print('>>', 'ireturn')
                 stack.pop()
             elif op == op_code['bipush']:
-                bytecodes.append('bipush')
+                print('>>', 'bipush')
                 val = parse_u1(code_io)
                 stack.append(val)
+            elif op == op_code['if_icmpge']:
+                curr = code_io.tell()-1
+                print(curr, '>>', 'if_icmpge')
+                val2 = stack.pop()
+                val1 = stack.pop()
+                b = parse_u2(code_io, signed=True)
+                print(code_io.tell()-1, '>>', b)
+
+                if val1 >= val2:
+                    code_io.seek(curr + b)
+            elif op == op_code['if_icmple']:
+                curr = code_io.tell()-1
+                print(curr, '>>', 'if_icmple')
+                val2 = stack.pop()
+                val1 = stack.pop()
+                branch = parse_u2(code_io)
+                print('>>', branch)
+
+                if val1 <= val2:
+                    code_io.seek(branch)
+            elif op == op_code['goto']:
+                curr = code_io.tell()-1
+                branch = parse_u2(code_io, signed=True)
+                print(curr, '>>', 'goto', branch)
+                code_io.seek(curr + branch)    
+            elif op == op_code['iinc']:
+                print(code_io.tell()-1, '>>', 'iinc')
+                index = parse_u1(code_io)
+                print(code_io.tell()-1, '>>', index)
+                const = parse_u1(code_io)
+                print(code_io.tell()-1, '>>', const)
+                locals[index] += const
             else:
                 assert False, f'Op Code {hex(op)} Not implemented'
 
-            # print(stack)
-        print('>>', bytecodes)
+            # print('>>', bytecodes[-1])
+            print(stack)
+        # print('>>', bytecodes)
